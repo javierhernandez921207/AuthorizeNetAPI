@@ -3,6 +3,7 @@ using AuthorizeNet.Api.Controllers;
 using AuthorizeNet.Api.Contracts.V1;
 using AuthorizeNet.Api.Controllers.Bases;
 using Microsoft.AspNetCore.Mvc;
+using AuthorizeNetAPI.Model;
 
 namespace AuthorizeNetAPI.Controllers
 {
@@ -18,72 +19,102 @@ namespace AuthorizeNetAPI.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult> CreateCustomer()
-        {
-            string email = "javier.hernandez@ntsprint.com";
+        public async Task<ActionResult> CreateCustomer([FromBody] CreateCustomerRequest createCustomerRequest)
+        {            
             Console.WriteLine("Create Customer Profile Sample");
 
             // set whether to use the sandbox environment, or production enviornment
-            bool isProd = false;
+            bool isProd = _configuration.GetSection("AuthorizeNet").GetSection("isProduction").Value == "true";
             ApiOperationBase<ANetApiRequest, ANetApiResponse>.RunEnvironment = isProd ? AuthorizeNet.Environment.PRODUCTION : AuthorizeNet.Environment.SANDBOX;
 
             // define the merchant information (authentication / transaction id)
             ApiOperationBase<ANetApiRequest, ANetApiResponse>.MerchantAuthentication = new merchantAuthenticationType()
             {
-                name = "464ZkyeRLfNG",
+                name = _configuration.GetSection("AuthorizeNet").GetSection("ApiLoginID").Value,
                 ItemElementName = ItemChoiceType.transactionKey,
-                Item = "2j38hQVL9j82zZN9",
+                Item = _configuration.GetSection("AuthorizeNet").GetSection("ApiTransactionKey").Value,
             };
-
-            var creditCard = new creditCardType
-            {
-                cardNumber = "4111111111111111",
-                expirationDate = "1028"
-            };
-
-            var bankAccount = new bankAccountType
-            {
-                accountNumber = "231323342",
-                routingNumber = "000000224",
-                accountType = bankAccountTypeEnum.checking,
-                echeckType = echeckTypeEnum.WEB,
-                nameOnAccount = "test",
-                bankName = "Bank Of America"
-            };
-
-            // standard api call to retrieve response
-            paymentType cc = new paymentType { Item = creditCard };
-            paymentType echeck = new paymentType { Item = bankAccount };
 
             List<customerPaymentProfileType> paymentProfileList = new List<customerPaymentProfileType>();
-            customerPaymentProfileType ccPaymentProfile = new customerPaymentProfileType();
-            ccPaymentProfile.payment = cc;
-
-            customerPaymentProfileType echeckPaymentProfile = new customerPaymentProfileType();
-            echeckPaymentProfile.payment = echeck;
-
-            paymentProfileList.Add(ccPaymentProfile);
-            paymentProfileList.Add(echeckPaymentProfile);
+            foreach (var ccp in createCustomerRequest.CreditCardProfiles)
+            {               
+                var creditCard = new creditCardType
+                {
+                    cardNumber = ccp.CardNumber,
+                    expirationDate = ccp.ExpirationDate,
+                    cardCode = ccp.CardCode
+                };
+                paymentType cc = new paymentType { Item = creditCard };
+                customerPaymentProfileType ccPaymentProfile = new()
+                {
+                    payment = cc,
+                    billTo = new customerAddressType() 
+                    {
+                        address = ccp.BilliTo.Address1,
+                        firstName = ccp.BilliTo.FirstName,
+                        lastName = ccp.BilliTo.LastName,
+                        city = ccp.BilliTo.City,
+                        country = ccp.BilliTo.Country,  
+                        state = ccp.BilliTo.State,
+                        zip = ccp.BilliTo.ZipCode,
+                        phoneNumber = ccp.BilliTo.PhoneNumber,
+                    },
+                    customerType = 0
+                };
+                paymentProfileList.Add(ccPaymentProfile);
+            }
+            foreach (var bap in createCustomerRequest.BankAccountProfiles)
+            {                
+                var bankAccount = new bankAccountType
+                {
+                    accountNumber = bap.AccountNumber,
+                    routingNumber = bap.RoutingNumber,
+                    accountType = bankAccountTypeEnum.checking,
+                    echeckType = echeckTypeEnum.WEB,
+                    nameOnAccount = bap.NameOnAccount,
+                    bankName = bap.BankName
+                };
+                paymentType echeck = new paymentType { Item = bankAccount };
+                customerPaymentProfileType echeckPaymentProfile = new()
+                {
+                    payment = echeck,
+                    billTo = new customerAddressType()
+                    {
+                        address = bap.BilliTo.Address1,
+                        firstName = bap.BilliTo.FirstName,
+                        lastName = bap.BilliTo.LastName,
+                        city = bap.BilliTo.City,
+                        country = bap.BilliTo.Country,
+                        state = bap.BilliTo.State,
+                        zip = bap.BilliTo.ZipCode,
+                        phoneNumber = bap.BilliTo.PhoneNumber,
+                    },
+                    customerType = 0
+                };
+                paymentProfileList.Add(echeckPaymentProfile);
+            }
 
             List<customerAddressType> addressInfoList = new List<customerAddressType>();
-            customerAddressType homeAddress = new customerAddressType();
-            homeAddress.address = "10900 NE 8th St";
-            homeAddress.city = "Seattle";
-            homeAddress.zip = "98006";
 
-
-            customerAddressType officeAddress = new customerAddressType();
-            officeAddress.address = "1200 148th AVE NE";
-            officeAddress.city = "NorthBend";
-            officeAddress.zip = "92101";
-
-            addressInfoList.Add(homeAddress);
-            addressInfoList.Add(officeAddress);
-
-
+            foreach (var address in createCustomerRequest.ShipToList) {
+                customerAddressType a = new()
+                {
+                    firstName = address.FirstName,
+                    lastName = address.LastName,
+                    address = address.Address1,
+                    city = address.City,
+                    zip = address.ZipCode,
+                    country = address.Country,
+                    state = address.State,
+                    phoneNumber = address.PhoneNumber,                    
+                };
+                addressInfoList.Add(a);
+            }
+            
             customerProfileType customerProfile = new customerProfileType();
-            customerProfile.merchantCustomerId = "Test CustomerID";
-            customerProfile.email = email;
+            customerProfile.merchantCustomerId = createCustomerRequest.CustomerId;
+            customerProfile.email = createCustomerRequest.CustomerEmail;
+            customerProfile.description = createCustomerRequest.CustomerName;
             customerProfile.paymentProfiles = paymentProfileList.ToArray();
             customerProfile.shipToList = addressInfoList.ToArray();
 
@@ -103,35 +134,39 @@ namespace AuthorizeNetAPI.Controllers
                 {
                     if (response.messages.message != null)
                     {
-                        Console.WriteLine("Success!");
-                        Console.WriteLine("Customer Profile ID: " + response.customerProfileId);
-                        Console.WriteLine("Payment Profile ID: " + response.customerPaymentProfileIdList[0]);
-                        Console.WriteLine("Shipping Profile ID: " + response.customerShippingAddressIdList[0]);
-                        return Ok(response);
+                        return Ok(new CreateCustomerResponse() { 
+                            CustomerProfileId = response.customerProfileId,
+                            CustomerPaymentProfileIdList = response.customerPaymentProfileIdList[0],
+                            CustomerShippingAddressIdList = response.customerShippingAddressIdList[0]
+                        });
                     }
                     return BadRequest(response);
                 }
                 else
-                {
-                    Console.WriteLine("Customer Profile Creation Failed.");
-                    Console.WriteLine("Error Code: " + response.messages.message[0].code);
-                    Console.WriteLine("Error message: " + response.messages.message[0].text);
-                    return BadRequest(response);
+                {                    
+                    return BadRequest(new ErrorResponse() { 
+                        Code = response.messages.message[0].code,
+                        Message = response.messages.message[0].text
+                    });
                 }
             }
             else
             {
                 if (controller.GetErrorResponse().messages.message.Length > 0)
                 {
-                    Console.WriteLine("Customer Profile Creation Failed.");
-                    Console.WriteLine("Error Code: " + response.messages.message[0].code);
-                    Console.WriteLine("Error message: " + response.messages.message[0].text);
-                    return BadRequest(response);
+                    return BadRequest(new ErrorResponse()
+                    {
+                        Code = controller.GetErrorResponse().messages.message[0].code,
+                        Message = controller.GetErrorResponse().messages.message[0].text
+                    });
                 }
                 else
                 {
-                    Console.WriteLine("Null Response.");
-                    return BadRequest(response);
+                    return BadRequest(new ErrorResponse()
+                    {
+                        Code = "unknow",
+                        Message = "null response from Authorize"
+                    });
                 }
             }
             
