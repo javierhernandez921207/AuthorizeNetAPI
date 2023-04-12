@@ -154,7 +154,7 @@ namespace AuthorizeNetAPI.Controllers
         }
 
         [HttpGet("{Id}")]
-        public ActionResult GetSubscription([FromRoute] string Id) {
+        public ActionResult<GetSubscriptionResponse> GetSubscription([FromRoute] string Id) {
             if (string.IsNullOrEmpty(Id))
                 return BadRequest(new GetListSubscriptionResponse()
                 {
@@ -215,6 +215,138 @@ namespace AuthorizeNetAPI.Controllers
                     Message = "Internal Server Error"
                 }
             });
+        }
+
+        [HttpPost("cancel/{Id}")]
+        public ActionResult<CancelSubscriptionResponse> CancelSubscription([FromRoute] string Id)
+        {
+            //Please change the subscriptionId according to your request
+            var request = new ARBCancelSubscriptionRequest { subscriptionId = Id };
+            var controller = new ARBCancelSubscriptionController(request); 
+            controller.Execute();
+
+            ARBCancelSubscriptionResponse response = controller.GetApiResponse();
+
+            // validate response
+            if (response != null && response.messages.resultCode == messageTypeEnum.Ok)
+            {
+                if (response != null && response.messages.message != null)
+                {
+                    return Ok(new CancelSubscriptionResponse() { IsCanceled = true});
+                }
+            }
+            else if (response != null)
+            {
+                return BadRequest(new CancelSubscriptionResponse() { 
+                    Error = new ErrorResponse() {
+                        Code = response.messages.message[0].code,
+                        Message = response.messages.message[0].text
+                    } });
+            }
+
+            return BadRequest(new CancelSubscriptionResponse() { 
+                Error = new ErrorResponse() { 
+                    Message = "Internal Server Error" 
+                } }); ;
+        }
+
+        [HttpPut]
+        public ActionResult UpdateSubscription([FromBody] UpdateSubscriptionRequest request)
+        {
+            if (request == null)
+            {
+                return BadRequest(new CreateSubscriptionResponse()
+                {
+                    Error = new ErrorResponse()
+                    {
+                        Message = "Incorret request"
+                    }
+                });
+            }
+            bool started = true;
+            //Search Subscription
+            var subscription = new ARBGetSubscriptionRequest { subscriptionId = request.SubscriptionId };
+            var controller = new ARBGetSubscriptionController(subscription);
+            controller.Execute();
+            ARBGetSubscriptionResponse response = controller.GetApiResponse();
+            if (response != null && response.messages.resultCode == messageTypeEnum.Ok)
+            {
+                if (response.subscription != null)
+                {
+                    if(response.subscription.paymentSchedule.startDate > DateTime.Today)
+                    {
+                        started = false;
+                    }
+                }
+            }
+            paymentScheduleType? schedule = null;
+            if (!started)
+            {
+                schedule = new()
+                {
+                    totalOccurrences = request.TotalOccurrences,
+                    trialOccurrences = request.TrialOccurrences
+                };
+            }
+            
+
+            customerProfileIdType customerProfile = new()
+            { 
+                customerProfileId = request.customerProfileId,
+                customerPaymentProfileId = request.customerPaymentProfileId,
+                customerAddressId = request.customerAddressId
+            };
+
+            ARBSubscriptionType subscriptionType;
+            if (started)
+                subscriptionType = new()
+                {
+                    amount = request.Amount,
+                    trialAmount = request.TrialAmount,
+                    profile = customerProfile
+                };
+            else
+                subscriptionType = new()
+                {
+                    amount = request.Amount,
+                    trialAmount = request.TrialAmount,
+                    paymentSchedule = schedule,
+                    profile = customerProfile
+                };
+
+            var updateRequest = new ARBUpdateSubscriptionRequest { subscription = subscriptionType, subscriptionId = request.SubscriptionId };
+            var controller2 = new ARBUpdateSubscriptionController(updateRequest);
+            controller2.Execute();
+
+            ARBUpdateSubscriptionResponse response2 = controller2.GetApiResponse();
+
+            if (response2 != null && response2.messages.resultCode == messageTypeEnum.Ok)
+            {
+                if (response2 != null && response2.messages.message != null)
+                {
+                    return Ok(new UpdateSubscriptionResponse() { IsUpdated = true});
+                }
+            }
+            else if (response2 != null)
+            {
+                return Ok(new UpdateSubscriptionResponse()
+                {
+                    Error = new ErrorResponse()
+                    {
+                        Code = response2.messages.message[0].code,
+                        Message = response2.messages.message[0].text
+                    }
+                });
+            }
+
+            return Ok(new UpdateSubscriptionResponse()
+            {
+                Error = new ErrorResponse()
+                {
+                    Message = "Internal Server Error"
+                }
+            });
+
         }
     }
 }

@@ -42,9 +42,15 @@ namespace AuthorizeNetAPI.AutoMapper
                 .ForMember(des => des.ZipCode, opt => opt.MapFrom(opt => opt.zip));
 
             CreateMap<SubscriptionDetail, SubscriptionResponse>();
-            CreateMap<ARBSubscriptionMaskedType, SubscriptionDetailResponse>();
-
-            CreateMap<>
+            CreateMap<ARBSubscriptionMaskedType, SubscriptionDetailResponse>()
+                .ForMember(des => des.IntervalUnit, opt => opt.MapFrom(opt => opt.paymentSchedule.interval.unit))
+                .ForMember(des => des.IntervalLength, opt => opt.MapFrom(opt => opt.paymentSchedule.interval.length))
+                .ForMember(des => des.StartDate, opt => opt.MapFrom(opt => opt.paymentSchedule.startDate))
+                .ForMember(des => des.TotalOccurrences, opt => opt.MapFrom(opt => opt.paymentSchedule.totalOccurrences))
+                .ForMember(des => des.TrialOccurrences, opt => opt.MapFrom(opt => opt.paymentSchedule.trialOccurrences))
+                .ForMember(des => des.CustomerID, opt => opt.MapFrom(opt => opt.profile.customerProfileId))
+                .ForMember(des => des.PaymentID, opt => opt.MapFrom(opt => opt.profile.paymentProfile.customerPaymentProfileId))
+                .ForMember(des => des.ShippingID, opt => opt.MapFrom(opt => opt.profile.shippingProfile.customerAddressId));
         }
     }
 }
