@@ -40,6 +40,11 @@ namespace AuthorizeNetAPI.AutoMapper
             CreateMap<customerAddressType, Address>()
                 .ForMember(des => des.Address1, opt => opt.MapFrom(opt => opt.address))
                 .ForMember(des => des.ZipCode, opt => opt.MapFrom(opt => opt.zip));
+
+            CreateMap<SubscriptionDetail, SubscriptionResponse>();
+            CreateMap<ARBSubscriptionMaskedType, SubscriptionDetailResponse>();
+
+            CreateMap<>
         }
     }
 }
