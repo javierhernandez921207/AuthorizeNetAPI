@@ -42,7 +42,7 @@ namespace AuthorizeNetAPI.Controllers
         [HttpPost]
         public ActionResult CreateCustomer([FromBody] CreateCustomerRequest createCustomerRequest)
         {          
-            List<customerPaymentProfileType> paymentProfileList = new List<customerPaymentProfileType>();
+            List<customerPaymentProfileType> paymentProfileList = new();
             if(createCustomerRequest.CreditCardProfiles != null)
                 foreach (var ccp in createCustomerRequest.CreditCardProfiles)
                 {
@@ -76,13 +76,15 @@ namespace AuthorizeNetAPI.Controllers
                 customerAddressType a = _mapper.Map<customerAddressType>(address);
                 addressInfoList.Add(a);
             }
-            
-            customerProfileType customerProfile = new ();
-            customerProfile.merchantCustomerId = createCustomerRequest.CustomerId;
-            customerProfile.email = createCustomerRequest.CustomerEmail;
-            customerProfile.description = createCustomerRequest.CustomerName;
-            customerProfile.paymentProfiles = paymentProfileList.ToArray();
-            customerProfile.shipToList = addressInfoList.ToArray();
+
+            customerProfileType customerProfile = new()
+            {
+                merchantCustomerId = createCustomerRequest.CustomerId,
+                email = createCustomerRequest.CustomerEmail,
+                description = createCustomerRequest.CustomerName,
+                paymentProfiles = paymentProfileList.ToArray(),
+                shipToList = addressInfoList.ToArray()
+            };
 
             var request = new createCustomerProfileRequest { profile = customerProfile, validationMode = validationModeEnum.none };
 

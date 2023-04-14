@@ -24,6 +24,8 @@ namespace AuthorizeNetAPI.AutoMapper
             CreateMap<CreditCard, creditCardType>();
             CreateMap<creditCardType, CreditCard>();
 
+            CreateMap<creditCardMaskedType, creditCardType>();
+
             CreateMap<bankAccountType, BankAccount>();
             CreateMap<BankAccount,bankAccountType>();
 
@@ -51,6 +53,8 @@ namespace AuthorizeNetAPI.AutoMapper
                 .ForMember(des => des.CustomerID, opt => opt.MapFrom(opt => opt.profile.customerProfileId))
                 .ForMember(des => des.PaymentID, opt => opt.MapFrom(opt => opt.profile.paymentProfile.customerPaymentProfileId))
                 .ForMember(des => des.ShippingID, opt => opt.MapFrom(opt => opt.profile.shippingProfile.customerAddressId));
+
+            CreateMap<transactionSummaryType, TransactionResponse>();
         }
     }
 }
